@@ -2,7 +2,7 @@ import uvicorn
 import aio_pika
 from fastapi import FastAPI
 from models.database import database
-from routers import users
+from routers import users, messages
 
 app = FastAPI()
 
@@ -30,6 +30,7 @@ async def subscribe_to_rabbit_queue():
         )
     if not connection:
         raise Exception('Broken connection to RabbitMQ')
+    app.state.connection = connection
     channel = await connection.channel()
     queue = await channel.declare_queue('test', durable=True)
     await queue.consume(
@@ -38,7 +39,12 @@ async def subscribe_to_rabbit_queue():
     )
 
 app.include_router(users.router)
+app.include_router(messages.router)
 app.add_event_handler("startup", subscribe_to_rabbit_queue)
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="info", reload=True)
+
+
+# docker run --hostname localhost -p 8080:5672 -p 15672:15672 rabbitmq:3-management
