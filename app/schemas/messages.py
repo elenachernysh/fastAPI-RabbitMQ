@@ -9,3 +9,7 @@ class MessageCreate(BaseModel):
 
 class Message(MessageCreate):
     id: str
+
+
+class MessageSender(BaseModel):
+    email: EmailStr

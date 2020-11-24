@@ -1,7 +1,8 @@
+import json
 from functools import wraps
-from fastapi import APIRouter, HTTPException, Depends, status, Request
+from fastapi import APIRouter, HTTPException, Depends, status, Request, Response
+from fastapi.responses import JSONResponse
 from schemas import messages
-from utils import messages as messages_utils
 from fastapi.security import OAuth2PasswordBearer
 from schemas.users import UserBase
 from utils.users import get_user_by_token
@@ -42,13 +43,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 @router.post("/message", response_model=messages.MessageCreate)
 @get_sender
 async def create_message(message: messages.MessageCreate, request: Request, current_user: UserBase = Depends(get_current_user)):
+    """ Post new message to RabbitMQ (queue name equals message sender : message recipient) """
     try:
         connection = request.app.state.connection
-        routing_key = message.sender
+        routing_key = json.dumps({message.sender: message.to})
         channel = await connection.channel()
-        queue = await channel.declare_queue(routing_key)
+        queue = await channel.declare_queue(routing_key, durable=True)
+        message_to_send = json.dumps(dict(message))
         await channel.default_exchange.publish(
-            aio_pika.Message(body="Hello {}".format(routing_key).encode()),
+            aio_pika.Message(body=message_to_send.encode()),
             routing_key=routing_key,
         )
         return message
@@ -60,4 +63,20 @@ async def create_message(message: messages.MessageCreate, request: Request, curr
             detail="Broken connection to RabbitMQ"
         )
 
-    # return await messages_utils.post_message_in_queue(message=message)
+
+@router.post("/receive_message")
+async def get_message(sender: messages.MessageSender,
+                      request: Request, current_user:
+                      UserBase = Depends(get_current_user)):
+    """ Get message from some sender (queue name equals message recipient) """
+    connection = request.app.state.connection
+    routing_key = json.dumps({sender.email: dict(current_user).get('email')})
+    channel = await connection.channel()
+    queue = await channel.declare_queue(routing_key, durable=True)
+    try:
+        message = await queue.get(no_ack=True)
+        return JSONResponse(content=json.loads(message.body))
+    except aio_pika.exceptions.QueueEmpty:
+        import traceback
+        traceback.print_exc()
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
