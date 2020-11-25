@@ -9,6 +9,7 @@ services:
       dockerfile: dockerfile
     ports:
       - "8000:8000"
+    network_mode: "host"
     environment:
-      'DB_HOST': '172.18.0.1'
-      'RABBIT_HOST': '172.18.0.1'
+      'DB_HOST': 'localhost'
+      'RABBIT_HOST': 'localhost'
