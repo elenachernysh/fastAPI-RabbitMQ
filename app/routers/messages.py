@@ -1,4 +1,5 @@
 import json
+from uuid import UUID
 from functools import wraps
 from fastapi import APIRouter, HTTPException, Depends, status, Request, Response
 from fastapi.responses import JSONResponse
@@ -22,11 +23,13 @@ def get_sender(decorated):
 
 
 def validate_token(token: str) -> bool:
-    return len(token) == 32
+    try:
+        return bool(UUID(token, version=4))
+    except ValueError:
+        return False
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
-    print(validate_token(token))
     if not validate_token(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
