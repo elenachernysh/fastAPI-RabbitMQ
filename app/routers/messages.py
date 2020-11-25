@@ -21,11 +21,12 @@ def get_sender(decorated):
     return wrapper
 
 
-def validate_token(token: str):
-    return bool(31 < len(token) < 37)
+def validate_token(token: str) -> bool:
+    return len(token) == 32
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
+    print(validate_token(token))
     if not validate_token(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -42,7 +43,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
 @router.post("/message", response_model=messages.MessageCreate)
 @get_sender
-async def create_message(message: messages.MessageCreate, request: Request, current_user: UserBase = Depends(get_current_user)):
+async def create_message(message: messages.MessageCreate,
+                         request: Request,
+                         current_user: UserBase = Depends(get_current_user)):
     """ Post new message to RabbitMQ (queue name equals message sender : message recipient) """
     try:
         connection = request.app.state.connection
@@ -68,7 +71,7 @@ async def create_message(message: messages.MessageCreate, request: Request, curr
 async def get_message(sender: messages.MessageSender,
                       request: Request, current_user:
                       UserBase = Depends(get_current_user)):
-    """ Get message from some sender (queue name equals message recipient) """
+    """ Get one message (the oldest because FIFO) from sender """
     connection = request.app.state.connection
     routing_key = json.dumps({sender.email: dict(current_user).get('email')})
     channel = await connection.channel()
