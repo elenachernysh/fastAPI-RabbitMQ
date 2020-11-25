@@ -3,8 +3,10 @@ import aio_pika
 from fastapi import FastAPI
 from models.database import database
 from routers import users, messages
+from os import environ
 
 app = FastAPI()
+RABBIT_HOST = environ.get("RABBIT_HOST", "localhost")
 
 
 @app.on_event("startup")
@@ -17,28 +19,15 @@ async def shutdown():
     await database.disconnect()
 
 
-# async def on_message(message: aio_pika.IncomingMessage):
-#     # TODO process messages
-#     print(message.body)
-#     message.ack()
-#     return message
-
-
 async def subscribe_to_rabbit_queue():
     """ Store a connection pool to RabbitMQ"""
     try:
         app.state.connection = await aio_pika.connect_robust(
-                "amqp://guest:guest@localhost:8080/%2f"
+                f"amqp://guest:guest@{RABBIT_HOST}:8080/%2f"
             )
     except ConnectionError:
         raise Exception('Broken connection to RabbitMQ')
-    # app.state.connection = connection
-    # channel = await connection.channel()
-    # queue = await channel.declare_queue('test', durable=True)
-    # await queue.consume(
-    #     callback=on_message,
-    #     no_ack=False,
-    # )
+
 
 app.include_router(users.router)
 app.include_router(messages.router)
