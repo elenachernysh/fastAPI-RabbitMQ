@@ -1,4 +1,5 @@
 import json
+from typing import Tuple
 from uuid import UUID
 from functools import wraps
 from fastapi import APIRouter, HTTPException, Depends, status, Request, Response
@@ -44,6 +45,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 
+async def rabbit_connect(routing_key: str, request: Request) -> Tuple[aio_pika.Channel, aio_pika.Queue]:
+    connection = request.app.state.connection
+    channel = await connection.channel()
+    queue = await channel.declare_queue(routing_key, durable=True)
+    return channel, queue
+
+
 @router.post("/message", response_model=messages.MessageCreate)
 @get_sender
 async def create_message(message: messages.MessageCreate,
@@ -51,10 +59,8 @@ async def create_message(message: messages.MessageCreate,
                          current_user: UserBase = Depends(get_current_user)):
     """ Post new message to RabbitMQ (queue name equals message sender : message recipient) """
     try:
-        connection = request.app.state.connection
         routing_key = json.dumps({message.sender: message.to})
-        channel = await connection.channel()
-        queue = await channel.declare_queue(routing_key, durable=True)
+        channel, queue = await rabbit_connect(routing_key=routing_key, request=request)
         message_to_send = json.dumps(dict(message))
         await channel.default_exchange.publish(
             aio_pika.Message(body=message_to_send.encode()),
@@ -75,10 +81,8 @@ async def get_message(sender: messages.MessageSender,
                       request: Request, current_user:
                       UserBase = Depends(get_current_user)):
     """ Get one message (the oldest because FIFO) from sender """
-    connection = request.app.state.connection
     routing_key = json.dumps({sender.email: dict(current_user).get('email')})
-    channel = await connection.channel()
-    queue = await channel.declare_queue(routing_key, durable=True)
+    channel, queue = await rabbit_connect(routing_key=routing_key, request=request)
     try:
         message = await queue.get(no_ack=True)
         return JSONResponse(content=json.loads(message.body))
