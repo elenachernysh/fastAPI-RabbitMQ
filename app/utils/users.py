@@ -45,7 +45,6 @@ async def create_user_token(user_id: int):
         .values(expires=datetime.now() + timedelta(weeks=2), user_id=user_id)
         .returning(tokens_table.c.token, tokens_table.c.expires)
     )
-
     return await database.fetch_one(query)
 
 

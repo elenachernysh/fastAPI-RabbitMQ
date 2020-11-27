@@ -1,6 +1,6 @@
 import sqlalchemy
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import create_engine, Column, Integer, String, Numeric, VARCHAR
+
 
 metadata = sqlalchemy.MetaData()
 
@@ -37,7 +37,7 @@ tokens_table = sqlalchemy.Table(
 )
 
 # to see the list of loaded extensions query the view pg_extension as such:
-# select * from pg_extension;
+# select * from pg_extension; or \df (for DB!!, not in general)
 
 # CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 # After the uuid-ossp extension is successfully loaded,
