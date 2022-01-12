@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  cats:
+    container_name: cats-service
+    restart: always
+    build:
+      context: .
+      dockerfile: dockerfile
+    ports:
+      - "8000:8000"
+    network_mode: "host"
+    environment:
+      'DB_HOST': 'localhost'
+      'RABBIT_HOST': 'localhost'
